@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Stretch/Fold Dynamics</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="topbar">
+        <div>
+          <h1>Stretch/Fold Dynamics</h1>
+          <p>6 layer |ax+b| MLP</p>
+        </div>
+        <div class="readouts">
+          <span id="stepReadout">step 0</span>
+          <span id="lossReadout">loss 0</span>
+        </div>
+      </section>
+
+      <section class="controls" aria-label="training controls">
+        <button id="playButton" type="button" title="Play or pause">Play</button>
+        <div class="lossScrubber" aria-label="loss curve timeline">
+          <canvas id="lossScrubCanvas"></canvas>
+          <input id="timeSlider" type="range" min="0" max="0" value="0" />
+        </div>
+      </section>
+
+      <section class="stage">
+        <canvas id="foldCanvas"></canvas>
+      </section>
+    </main>
+
+    <script src="data/trajectory.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
