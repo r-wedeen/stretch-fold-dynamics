@@ -1,18 +1,28 @@
 (function () {
   "use strict";
 
-  const data = window.TRAJECTORY;
-  if (!data) {
+  const examples = [
+    { key: "quartic", data: window.QUARTIC_TRAJECTORY },
+    { key: "quintic", data: window.QUINTIC_TRAJECTORY },
+  ];
+
+  if (!examples.some((example) => example.data)) {
     document.body.innerHTML = "<main class='app'><h1>No trajectory data</h1><p>Run scripts/train_export.py first.</p></main>";
     return;
   }
 
-  const foldCanvas = document.getElementById("foldCanvas");
-  const lossScrubCanvas = document.getElementById("lossScrubCanvas");
-  const playButton = document.getElementById("playButton");
-  const timeSlider = document.getElementById("timeSlider");
-  const stepReadout = document.getElementById("stepReadout");
-  const lossReadout = document.getElementById("lossReadout");
+  for (const example of examples) {
+    const root = document.querySelector(`[data-example="${example.key}"]`);
+    if (root && example.data) setupViewer(root, example.data);
+  }
+
+  function setupViewer(root, data) {
+  const foldCanvas = root.querySelector(".foldCanvas");
+  const lossScrubCanvas = root.querySelector(".lossScrubCanvas");
+  const playButton = root.querySelector(".playButton");
+  const timeSlider = root.querySelector(".timeSlider");
+  const stepReadout = root.querySelector(".stepReadout");
+  const lossReadout = root.querySelector(".lossReadout");
 
   const snapshots = data.snapshots;
   const x = data.x;
@@ -24,11 +34,12 @@
   const playbackEndStep = Math.min(300, data.meta.steps);
   const playbackStepMs = 13 * (1000 / playbackEndStep);
   let frame = 0;
-  let playing = false;
+  let playing = true;
   let lastTick = 0;
   let playbackStep = playbackStartStep;
 
   timeSlider.max = String(playbackEndStep);
+  playButton.textContent = "Pause";
 
   function paddedExtent(values) {
     let min = Infinity;
@@ -621,4 +632,6 @@
 
   frame = nearestSnapshotIndex(playbackStartStep);
   render();
+  requestAnimationFrame(tick);
+  }
 })();

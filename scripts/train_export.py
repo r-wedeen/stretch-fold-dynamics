@@ -36,6 +36,12 @@ def target_values_np(np, x, name: str):
         return 0.45 * x * x - 0.8
     if name == "quartic":
         return 0.12 * x**4 - 0.62 * x * x + 0.28
+    if name == "quintic":
+        u = x / 2.8
+        return 1.05 * (16.0 * u**5 - 20.0 * u**3 + 5.0 * u)
+    if name == "septic":
+        u = x / 2.8
+        return 1.05 * (64.0 * u**7 - 112.0 * u**5 + 56.0 * u**3 - 7.0 * u)
     raise ValueError(f"unknown target {name!r}")
 
 
@@ -64,6 +70,12 @@ def target_values_torch(torch, x, name: str):
         return 0.45 * x * x - 0.8
     if name == "quartic":
         return 0.12 * x**4 - 0.62 * x * x + 0.28
+    if name == "quintic":
+        u = x / 2.8
+        return 1.05 * (16.0 * u**5 - 20.0 * u**3 + 5.0 * u)
+    if name == "septic":
+        u = x / 2.8
+        return 1.05 * (64.0 * u**7 - 112.0 * u**5 + 56.0 * u**3 - 7.0 * u)
     raise ValueError(f"unknown target {name!r}")
 
 
@@ -298,10 +310,10 @@ def build_payload(args, x, target, snapshots, meta):
     }
 
 
-def write_js(path: str, payload):
+def write_js(path: str, payload, global_name: str):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as handle:
-        handle.write("window.TRAJECTORY = ")
+        handle.write(f"{global_name} = ")
         json.dump(payload, handle, separators=(",", ":"))
         handle.write(";\n")
 
@@ -309,7 +321,7 @@ def write_js(path: str, payload):
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--backend", choices=["auto", "numpy", "torch"], default="auto")
-    parser.add_argument("--target", choices=["abs", "sinmix", "triangle", "sawtooth", "bump", "quadratic", "quartic"], default="quartic")
+    parser.add_argument("--target", choices=["abs", "sinmix", "triangle", "sawtooth", "bump", "quadratic", "quartic", "quintic", "septic"], default="quintic")
     parser.add_argument("--layers", type=int, default=6)
     parser.add_argument("--samples", type=int, default=520)
     parser.add_argument("--steps", type=int, default=1500)
@@ -328,6 +340,7 @@ def parse_args():
     parser.add_argument("--xmax", type=float, default=2.8)
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--out", default="viewer/data/trajectory.js")
+    parser.add_argument("--global-name", default="window.TRAJECTORY")
     return parser.parse_args()
 
 
@@ -348,7 +361,7 @@ def main():
         x, target, snapshots, meta = train_numpy(args)
 
     payload = build_payload(args, x, target, snapshots, meta)
-    write_js(args.out, payload)
+    write_js(args.out, payload, args.global_name)
     first = snapshots[0].loss
     last = snapshots[-1].loss
     print(f"wrote {args.out}")

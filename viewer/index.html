@@ -4,35 +4,69 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Stretch/Fold Dynamics</title>
-    <link rel="stylesheet" href="styles.css?v=20260510b" />
+    <link rel="stylesheet" href="styles.css?v=20260511a" />
   </head>
   <body>
     <main class="app">
-      <section class="topbar">
-        <div>
-          <h1>Stretch/Fold Dynamics</h1>
-          <p>6 layer |ax+b| MLP · quartic target</p>
-        </div>
-        <div class="readouts">
-          <span id="stepReadout">step 0</span>
-          <span id="lossReadout">loss 0</span>
-        </div>
+      <header class="pageHeader">
+        <h1>Stretch/Fold Dynamics</h1>
+        <p>6 layer |ax+b| MLP</p>
+        <p class="questions">
+          Questions: How much of feature learning is driven by stretch and fold dynamics? In the case of ReLU networks, how much does this add beyond MLPs whose gates are parameter-independent and fixed in time? Why does there seem to be 2 phases of learning in the examples below?
+        </p>
+      </header>
+
+      <section class="example" data-example="quartic">
+        <section class="topbar">
+          <div>
+            <h2>Quartic target</h2>
+          </div>
+          <div class="readouts">
+            <span class="stepReadout">step 0</span>
+            <span class="lossReadout">loss 0</span>
+          </div>
+        </section>
+
+        <section class="controls" aria-label="quartic training controls">
+          <button class="playButton" type="button" title="Play or pause">Play</button>
+          <div class="lossScrubber" aria-label="quartic loss curve timeline">
+            <canvas class="lossScrubCanvas"></canvas>
+            <input class="timeSlider" type="range" min="0" max="0" value="0" />
+          </div>
+        </section>
+
+        <section class="stage">
+          <canvas class="foldCanvas"></canvas>
+        </section>
       </section>
 
-      <section class="controls" aria-label="training controls">
-        <button id="playButton" type="button" title="Play or pause">Play</button>
-        <div class="lossScrubber" aria-label="loss curve timeline">
-          <canvas id="lossScrubCanvas"></canvas>
-          <input id="timeSlider" type="range" min="0" max="0" value="0" />
-        </div>
-      </section>
+      <section class="example" data-example="quintic">
+        <section class="topbar">
+          <div>
+            <h2>Quintic target</h2>
+          </div>
+          <div class="readouts">
+            <span class="stepReadout">step 0</span>
+            <span class="lossReadout">loss 0</span>
+          </div>
+        </section>
 
-      <section class="stage">
-        <canvas id="foldCanvas"></canvas>
+        <section class="controls" aria-label="quintic training controls">
+          <button class="playButton" type="button" title="Play or pause">Play</button>
+          <div class="lossScrubber" aria-label="quintic loss curve timeline">
+            <canvas class="lossScrubCanvas"></canvas>
+            <input class="timeSlider" type="range" min="0" max="0" value="0" />
+          </div>
+        </section>
+
+        <section class="stage">
+          <canvas class="foldCanvas"></canvas>
+        </section>
       </section>
     </main>
 
-    <script src="data/trajectory.js?v=20260510b"></script>
-    <script src="app.js?v=20260510b"></script>
+    <script src="data/quartic.js?v=20260511a"></script>
+    <script src="data/quintic.js?v=20260511a"></script>
+    <script src="app.js?v=20260511a"></script>
   </body>
 </html>
