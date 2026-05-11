@@ -163,8 +163,8 @@ input[type="range"] {
 #foldCanvas {
   display: block;
   width: 100%;
-  height: min(74vh, 840px);
-  min-height: 560px;
+  height: min(82vh, 760px);
+  min-height: 700px;
 }
 
 @media (max-width: 860px) {
@@ -186,6 +186,6 @@ input[type="range"] {
   }
 
   #foldCanvas {
-    height: 540px;
+    height: 720px;
   }
 }

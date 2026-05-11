@@ -35,20 +35,20 @@ y = c h_L + d
 
 The colors stay attached to the original input coordinate. As training progresses, the same colored material points move through the learned sequence of affine stretches and absolute-value folds.
 
-The default target is `sinmix`, a smooth oscillatory function. Use `--target abs` when you want the simplest `f(x) = |x|` fold.
+The default target is `quartic`, a smooth double-well curve. Use `--target abs` for the simplest `f(x) = |x|` fold, `--target triangle` for a repeating triangle wave, or `--target sinmix` for a higher-frequency oscillatory mixture.
 
 ## Useful Options
 
 ```bash
-python3 scripts/train_export.py --target triangle --layers 6 --steps 250 --snapshots 251
-python3 scripts/train_export.py --target sinmix --lr 0.01 --samples 700
-python3 scripts/train_export.py --target abs --layers 6
+python3 scripts/train_export.py --target triangle --layers 6 --steps 1500 --snapshots 1001
+python3 scripts/train_export.py --target sinmix --optimizer gd --lr 0.008 --steps 3000
+python3 scripts/train_export.py --target abs --layers 20
 python3 scripts/train_export.py --snapshot-schedule linear
 python3 scripts/train_export.py --snapshot-power 3.0
 python3 scripts/train_export.py --out viewer/data/trajectory.js
 ```
 
-The default snapshot schedule is linear with one saved frame per training step from 0 to 250. Use `--snapshot-schedule early` when you want a smaller export that concentrates frames near the start.
+The default optimizer is Adam. Use `--optimizer gd` for calmer full-batch gradient descent, though it may fit less aggressively. The default snapshot schedule is linear with 1001 saved frames from step 0 to 1500. Use `--snapshot-schedule early` when you want a smaller export that concentrates frames near the start.
 
 If PyTorch is installed, you can request it explicitly:
 

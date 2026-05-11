@@ -18,12 +18,11 @@
   const x = data.x;
   const target = data.target;
   const targetDomain = paddedExtent(target);
-  const allLayerValues = snapshots.flatMap((snap) => rowsForSnapshot(snap).flatMap((row) => row.values));
-  const layerDomain = paddedExtent(allLayerValues);
+  const xDomain = horizontalAxisDomain();
   const outputDomain = paddedExtent(target.concat(snapshots.flatMap((snap) => snap.pred)));
   const playbackStartStep = 0;
-  const playbackEndStep = Math.min(250, data.meta.steps);
-  const playbackStepMs = 26;
+  const playbackEndStep = Math.min(300, data.meta.steps);
+  const playbackStepMs = 13 * (1000 / playbackEndStep);
   let frame = 0;
   let playing = false;
   let lastTick = 0;
@@ -40,6 +39,40 @@
     }
     if (!Number.isFinite(min) || !Number.isFinite(max)) return [-1, 1];
     const pad = Math.max((max - min) * 0.08, 0.1);
+    return [min - pad, max + pad];
+  }
+
+  function tightExtent(values) {
+    let min = Infinity;
+    let max = -Infinity;
+    for (const value of values) {
+      if (value < min) min = value;
+      if (value > max) max = value;
+    }
+    if (!Number.isFinite(min) || !Number.isFinite(max)) return [-1, 1];
+    if (Math.abs(max - min) < 1e-8) return [min - 1, max + 1];
+    return [min, max];
+  }
+
+  function horizontalAxisDomain() {
+    let min = Infinity;
+    let max = -Infinity;
+    function observe(values) {
+      for (const value of values) {
+        if (value < min) min = value;
+        if (value > max) max = value;
+      }
+    }
+
+    observe(x);
+    observe(target);
+    for (const snap of snapshots) {
+      for (const layer of snap.layers) observe(layer);
+      observe(snap.pred);
+    }
+
+    if (!Number.isFinite(min) || !Number.isFinite(max)) return tightExtent(x);
+    const pad = Math.max((max - min) * 0.04, 0.1);
     return [min - pad, max + pad];
   }
 
@@ -94,13 +127,22 @@
   }
 
   function formatFoldLabel(a, b) {
-    const sign = b < 0 ? "-" : "+";
-    return `|${formatNumber(a)}x ${sign} ${formatNumber(Math.abs(b))}|`;
+    const displayA = a < 0 ? -a : a;
+    const displayB = a < 0 ? -b : b;
+    const sign = displayB < 0 ? "-" : "+";
+    return `|${formatNumber(displayA)}x ${sign} ${formatNumber(Math.abs(displayB))}|`;
   }
 
   function formatAffineLabel(c, d) {
     const sign = d < 0 ? "-" : "+";
     return `${formatNumber(c)}x ${sign} ${formatNumber(Math.abs(d))}`;
+  }
+
+  function compactRowLabel(label) {
+    const hidden = label.match(/^hidden layer (\d+)$/);
+    if (hidden) return `h${hidden[1]}`;
+    if (label === "identity colors") return "identity";
+    return label;
   }
 
   function rowsForSnapshot(snap) {
@@ -135,28 +177,44 @@
     ctx.lineWidth = 1;
     ctx.fillStyle = "#62666f";
     ctx.font = "12px ui-sans-serif, system-ui";
+    ctx.textAlign = "left";
     for (let l = 0; l < rows.length; l += 1) {
       const yPos = mapValue(l, [0, rows.length - 1], [top, bottom]);
       ctx.beginPath();
       ctx.moveTo(left, yPos);
       ctx.lineTo(right, yPos);
       ctx.stroke();
-      ctx.fillText(rows[l].label, 14, yPos + 4);
+      ctx.fillText(compactRowLabel(rows[l].label), 8, yPos + 4);
+    }
+    const transforms = transformLabelsForSnapshot(snap);
+    const arrowX = 16;
+    ctx.strokeStyle = "rgba(155, 63, 79, 0.28)";
+    ctx.fillStyle = "rgba(155, 63, 79, 0.28)";
+    ctx.lineWidth = 1.2;
+    for (const transform of transforms) {
+      const yStart = mapValue(transform.row - 0.5, [0, rows.length - 1], [top, bottom]) + 13;
+      const yEnd = mapValue(transform.row + 0.5, [0, rows.length - 1], [top, bottom]) - 13;
+      ctx.beginPath();
+      ctx.moveTo(arrowX, yStart);
+      ctx.lineTo(arrowX, yEnd);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(arrowX, yEnd);
+      ctx.lineTo(arrowX - 4, yEnd - 5);
+      ctx.lineTo(arrowX + 4, yEnd - 5);
+      ctx.closePath();
+      ctx.fill();
     }
     ctx.fillStyle = "#9b3f4f";
-    ctx.font = "11px ui-sans-serif, system-ui";
-    for (const transform of transformLabelsForSnapshot(snap)) {
+    ctx.font = "10.5px ui-sans-serif, system-ui";
+    ctx.textAlign = "left";
+    for (const transform of transforms) {
       const yPos = mapValue(transform.row, [0, rows.length - 1], [top, bottom]);
-      ctx.fillText(transform.label, 14, yPos + 4);
-    }
-    const zeroX = mapValue(0, layerDomain, [left, right]);
-    if (zeroX > left && zeroX < right) {
-      ctx.strokeStyle = "#b7bdc8";
-      ctx.setLineDash([5, 7]);
-      ctx.beginPath();
-      ctx.moveTo(zeroX, top - 10);
-      ctx.lineTo(zeroX, bottom + 10);
-      ctx.stroke();
+      const labelWidth = ctx.measureText(transform.label).width;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(6, yPos - 8, labelWidth + 6, 14);
+      ctx.fillStyle = "#9b3f4f";
+      ctx.fillText(transform.label, 8, yPos + 3);
     }
     ctx.restore();
   }
@@ -165,8 +223,8 @@
     const { ctx, width, height } = fitCanvas(foldCanvas);
     const snap = snapshots[frame];
     const rows = rowsForSnapshot(snap);
-    const left = 196;
-    const right = width - 26;
+    const left = 164;
+    const right = width - 18;
     const graphTop = 22;
     const graphBottom = 136;
     const top = 176;
@@ -191,12 +249,14 @@
     ctx.save();
     ctx.fillStyle = "#62666f";
     ctx.font = "12px ui-sans-serif, system-ui";
-    ctx.fillText("target / output", 14, (top + bottom) / 2 + 4);
+    ctx.textAlign = "center";
+    ctx.fillText("target / output", (left + right) / 2, top - 8);
 
     ctx.strokeStyle = "#e1e4ea";
     ctx.fillStyle = "#62666f";
     ctx.lineWidth = 1;
     ctx.font = "11px ui-sans-serif, system-ui";
+    ctx.textAlign = "left";
     for (let tick = 0; tick <= 4; tick += 1) {
       const t = tick / 4;
       const yPos = lerp(bottom, top, t);
@@ -205,14 +265,14 @@
       ctx.moveTo(left, yPos);
       ctx.lineTo(right, yPos);
       ctx.stroke();
-      ctx.fillText(value.toFixed(2), 112, yPos + 4);
+      ctx.fillText(value.toFixed(2), 8, yPos + 4);
     }
 
     ctx.strokeStyle = "#161719";
     ctx.lineWidth = 2.2;
     ctx.beginPath();
     for (let i = 0; i < x.length; i += 1) {
-      const px = mapValue(x[i], layerDomain, [left, right]);
+      const px = mapValue(x[i], xDomain, [left, right]);
       const py = mapValue(snap.pred[i], outputDomain, [bottom, top]);
       if (i === 0) ctx.moveTo(px, py);
       else ctx.lineTo(px, py);
@@ -226,8 +286,8 @@
       const j = Math.min(i + stride, x.length - 1);
       ctx.strokeStyle = targetColorFor(Math.floor((i + j) / 2));
       ctx.beginPath();
-      ctx.moveTo(mapValue(x[i], layerDomain, [left, right]), mapValue(target[i], outputDomain, [bottom, top]));
-      ctx.lineTo(mapValue(x[j], layerDomain, [left, right]), mapValue(target[j], outputDomain, [bottom, top]));
+      ctx.moveTo(mapValue(x[i], xDomain, [left, right]), mapValue(target[i], outputDomain, [bottom, top]));
+      ctx.lineTo(mapValue(x[j], xDomain, [left, right]), mapValue(target[j], outputDomain, [bottom, top]));
       ctx.stroke();
     }
     ctx.restore();
@@ -235,7 +295,7 @@
 
   function materialPoint(rows, layerIndex, sampleIndex, left, right, top, bottom) {
     return {
-      x: mapValue(rows[layerIndex].values[sampleIndex], layerDomain, [left, right]),
+      x: mapValue(rows[layerIndex].values[sampleIndex], xDomain, [left, right]),
       y: mapValue(layerIndex, [0, rows.length - 1], [top, bottom]),
     };
   }
@@ -303,8 +363,8 @@
         const yPos = laneY(l, lane, segments.length, rows, top, bottom);
         for (let i = segment.start; i < segment.end; i += drawStride) {
           const j = Math.min(i + drawStride, segment.end);
-          const p0x = mapValue(values[i], layerDomain, [left, right]);
-          const p1x = mapValue(values[j], layerDomain, [left, right]);
+          const p0x = mapValue(values[i], xDomain, [left, right]);
+          const p1x = mapValue(values[j], xDomain, [left, right]);
           ctx.strokeStyle = rowColor(rows[l], Math.floor((i + j) / 2), snap);
           ctx.beginPath();
           ctx.moveTo(p0x, yPos);
@@ -317,7 +377,7 @@
       for (let lane = 0; lane < segments.length - 1; lane += 1) {
         const turnIndex = segments[lane].end;
         const turnValue = values[turnIndex];
-        const xPos = mapValue(turnValue, layerDomain, [left, right]);
+        const xPos = mapValue(turnValue, xDomain, [left, right]);
         const y0 = laneY(l, lane, segments.length, rows, top, bottom);
         const y1 = laneY(l, lane + 1, segments.length, rows, top, bottom);
         ctx.strokeStyle = rowColor(rows[l], turnIndex, snap);
@@ -337,8 +397,8 @@
         const nextLane = laneIndexForSample(rowSegments[l], i);
         const priorY = laneY(l - 1, priorLane, rowSegments[l - 1].length, rows, top, bottom);
         const nextY = laneY(l, nextLane, rowSegments[l].length, rows, top, bottom);
-        const p0x = mapValue(rows[l - 1].values[i], layerDomain, [left, right]);
-        const p1x = mapValue(rows[l].values[i], layerDomain, [left, right]);
+        const p0x = mapValue(rows[l - 1].values[i], xDomain, [left, right]);
+        const p1x = mapValue(rows[l].values[i], xDomain, [left, right]);
         ctx.strokeStyle = colorFor(i);
         ctx.beginPath();
         ctx.moveTo(p0x, priorY);

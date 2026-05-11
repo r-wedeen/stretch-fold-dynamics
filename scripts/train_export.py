@@ -15,15 +15,27 @@ def target_values_np(np, x, name: str):
     if name == "abs":
         return np.abs(x)
     if name == "sinmix":
-        return np.sin(2.2 * x) + 0.22 * np.cos(5.1 * x)
+        return (
+            0.72 * np.sin(2.2 * x)
+            + 0.28 * np.cos(5.1 * x)
+            - 0.18 * np.sin(8.4 * x + 0.35)
+            + 0.13 * np.cos(12.7 * x - 0.4)
+            + 0.08 * np.sin(17.3 * x + 1.1)
+        )
     if name == "triangle":
         period = 1.6
         u = (x / period) - np.floor((x / period) + 0.5)
         return 1.0 - 4.0 * np.abs(u)
+    if name == "sawtooth":
+        period = 1.4
+        u = (x / period) - np.floor(x / period)
+        return 1.6 * u - 0.8
     if name == "bump":
         return 1.2 * np.exp(-1.4 * (x + 0.8) ** 2) - 0.9 * np.exp(-2.2 * (x - 0.9) ** 2)
     if name == "quadratic":
         return 0.45 * x * x - 0.8
+    if name == "quartic":
+        return 0.12 * x**4 - 0.62 * x * x + 0.28
     raise ValueError(f"unknown target {name!r}")
 
 
@@ -31,15 +43,27 @@ def target_values_torch(torch, x, name: str):
     if name == "abs":
         return torch.abs(x)
     if name == "sinmix":
-        return torch.sin(2.2 * x) + 0.22 * torch.cos(5.1 * x)
+        return (
+            0.72 * torch.sin(2.2 * x)
+            + 0.28 * torch.cos(5.1 * x)
+            - 0.18 * torch.sin(8.4 * x + 0.35)
+            + 0.13 * torch.cos(12.7 * x - 0.4)
+            + 0.08 * torch.sin(17.3 * x + 1.1)
+        )
     if name == "triangle":
         period = 1.6
         u = (x / period) - torch.floor((x / period) + 0.5)
         return 1.0 - 4.0 * torch.abs(u)
+    if name == "sawtooth":
+        period = 1.4
+        u = (x / period) - torch.floor(x / period)
+        return 1.6 * u - 0.8
     if name == "bump":
         return 1.2 * torch.exp(-1.4 * (x + 0.8) ** 2) - 0.9 * torch.exp(-2.2 * (x - 0.9) ** 2)
     if name == "quadratic":
         return 0.45 * x * x - 0.8
+    if name == "quartic":
+        return 0.12 * x**4 - 0.62 * x * x + 0.28
     raise ValueError(f"unknown target {name!r}")
 
 
@@ -56,14 +80,14 @@ def rounded(values, digits: int = 5):
     return [round(float(v), digits) for v in values]
 
 
-def init_numpy_params(np, layers: int, seed: int):
-    rng = np.random.default_rng(seed)
-    a = rng.normal(1.15, 0.32, size=layers)
-    signs = np.where(rng.random(layers) < 0.5, -1.0, 1.0)
+def init_numpy_params(np, args):
+    rng = np.random.default_rng(args.seed)
+    a = rng.normal(args.init_a_mean, args.init_a_std, size=args.layers)
+    signs = np.where(rng.random(args.layers) < 0.5, -1.0, 1.0)
     a = a * signs
-    b = rng.normal(0.0, 0.35, size=layers)
-    c = np.array(rng.normal(0.8, 0.25))
-    d = np.array(rng.normal(0.0, 0.15))
+    b = rng.normal(0.0, args.init_b_std, size=args.layers)
+    c = np.array(rng.normal(args.init_c_mean, args.init_c_std))
+    d = np.array(rng.normal(0.0, args.init_d_std))
     return {"a": a, "b": b, "c": c, "d": d}
 
 
@@ -96,7 +120,7 @@ def train_numpy(args) -> Tuple[List[float], List[float], List[Snapshot], Dict[st
 
     x = np.linspace(args.xmin, args.xmax, args.samples)
     target = target_values_np(np, x, args.target)
-    params = init_numpy_params(np, args.layers, args.seed)
+    params = init_numpy_params(np, args)
     snapshot_steps = snapshot_step_set(np, args)
     snapshots: List[Snapshot] = []
 
@@ -148,13 +172,19 @@ def train_numpy(args) -> Tuple[List[float], List[float], List[Snapshot], Dict[st
             grads["b"][idx] = np.sum(grad_z)
             grad_h = grad_z * params["a"][idx]
 
-        t = step + 1
-        for name in params:
-            moments[name] = beta1 * moments[name] + (1.0 - beta1) * grads[name]
-            velocities[name] = beta2 * velocities[name] + (1.0 - beta2) * (grads[name] ** 2)
-            m_hat = moments[name] / (1.0 - beta1**t)
-            v_hat = velocities[name] / (1.0 - beta2**t)
-            params[name] = params[name] - args.lr * m_hat / (np.sqrt(v_hat) + eps)
+        if args.optimizer == "gd":
+            for name in params:
+                params[name] = params[name] - args.lr * grads[name]
+        elif args.optimizer == "adam":
+            t = step + 1
+            for name in params:
+                moments[name] = beta1 * moments[name] + (1.0 - beta1) * grads[name]
+                velocities[name] = beta2 * velocities[name] + (1.0 - beta2) * (grads[name] ** 2)
+                m_hat = moments[name] / (1.0 - beta1**t)
+                v_hat = velocities[name] / (1.0 - beta2**t)
+                params[name] = params[name] - args.lr * m_hat / (np.sqrt(v_hat) + eps)
+        else:
+            raise ValueError(f"unknown optimizer {args.optimizer!r}")
 
     meta = {"backend": "numpy", "target": args.target}
     return rounded(x), rounded(target), snapshots, meta
@@ -167,14 +197,19 @@ def train_torch(args) -> Tuple[List[float], List[float], List[Snapshot], Dict[st
     x = torch.linspace(args.xmin, args.xmax, args.samples)
     target = target_values_torch(torch, x, args.target)
 
-    a = torch.nn.Parameter(torch.randn(args.layers) * 0.32 + 1.15)
+    a = torch.nn.Parameter(torch.randn(args.layers) * args.init_a_std + args.init_a_mean)
     signs = torch.where(torch.rand(args.layers) < 0.5, -1.0, 1.0)
     with torch.no_grad():
         a.mul_(signs)
-    b = torch.nn.Parameter(torch.randn(args.layers) * 0.35)
-    c = torch.nn.Parameter(torch.randn(()) * 0.25 + 0.8)
-    d = torch.nn.Parameter(torch.randn(()) * 0.15)
-    opt = torch.optim.Adam([a, b, c, d], lr=args.lr)
+    b = torch.nn.Parameter(torch.randn(args.layers) * args.init_b_std)
+    c = torch.nn.Parameter(torch.randn(()) * args.init_c_std + args.init_c_mean)
+    d = torch.nn.Parameter(torch.randn(()) * args.init_d_std)
+    if args.optimizer == "gd":
+        opt = torch.optim.SGD([a, b, c, d], lr=args.lr)
+    elif args.optimizer == "adam":
+        opt = torch.optim.Adam([a, b, c, d], lr=args.lr)
+    else:
+        raise ValueError(f"unknown optimizer {args.optimizer!r}")
     import numpy as np
 
     snapshot_steps = snapshot_step_set(np, args)
@@ -236,7 +271,16 @@ def build_payload(args, x, target, snapshots, meta):
             "xmin": args.xmin,
             "xmax": args.xmax,
             "lr": args.lr,
+            "optimizer": args.optimizer,
             "seed": args.seed,
+            "init": {
+                "aMean": args.init_a_mean,
+                "aStd": args.init_a_std,
+                "bStd": args.init_b_std,
+                "cMean": args.init_c_mean,
+                "cStd": args.init_c_std,
+                "dStd": args.init_d_std,
+            },
         },
         "x": x,
         "target": target,
@@ -265,14 +309,21 @@ def write_js(path: str, payload):
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--backend", choices=["auto", "numpy", "torch"], default="auto")
-    parser.add_argument("--target", choices=["abs", "sinmix", "triangle", "bump", "quadratic"], default="sinmix")
+    parser.add_argument("--target", choices=["abs", "sinmix", "triangle", "sawtooth", "bump", "quadratic", "quartic"], default="quartic")
     parser.add_argument("--layers", type=int, default=6)
     parser.add_argument("--samples", type=int, default=520)
-    parser.add_argument("--steps", type=int, default=250)
-    parser.add_argument("--snapshots", type=int, default=251)
+    parser.add_argument("--steps", type=int, default=1500)
+    parser.add_argument("--snapshots", type=int, default=1001)
     parser.add_argument("--snapshot-schedule", choices=["early", "linear"], default="linear")
     parser.add_argument("--snapshot-power", type=float, default=2.4)
-    parser.add_argument("--lr", type=float, default=0.012)
+    parser.add_argument("--optimizer", choices=["gd", "adam"], default="adam")
+    parser.add_argument("--lr", type=float, default=0.010)
+    parser.add_argument("--init-a-mean", type=float, default=1.00)
+    parser.add_argument("--init-a-std", type=float, default=0.12)
+    parser.add_argument("--init-b-std", type=float, default=0.10)
+    parser.add_argument("--init-c-mean", type=float, default=0.8)
+    parser.add_argument("--init-c-std", type=float, default=0.12)
+    parser.add_argument("--init-d-std", type=float, default=0.08)
     parser.add_argument("--xmin", type=float, default=-2.8)
     parser.add_argument("--xmax", type=float, default=2.8)
     parser.add_argument("--seed", type=int, default=7)
